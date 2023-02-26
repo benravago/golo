@@ -1,0 +1,50 @@
+#
+a() {
+cat > ${1}.java << ..
+package golo.compiler.ast;
+public class ${1} extends Node {}
+..
+}
+a AdditiveExpression
+a AndExpression
+a AnonymousFunctionInvocation
+a Argument
+a Assignment
+a AugmentDeclaration
+a Block
+a Break
+a Case
+a CollectionLiteral
+a CompilationUnit
+a ConditionalBranching
+a Continue
+a DecoratorDeclaration
+a DestructuringAssignment
+a EqualityExpression
+a ForEachLoop
+a ForLoop
+a Function
+a FunctionDeclaration
+a FunctionInvocation
+a ImportDeclaration
+a InvocationExpression
+a LetOrVar
+a Literal
+a MacroInvocation
+a MemberDeclaration
+a MethodInvocation
+a ModuleDeclaration
+a MultiplicativeExpression
+a NamedAugmentationDeclaration
+a OrExpression
+a OrIfNullExpression
+a Reference
+a RelationalExpression
+a Return
+a StructDeclaration
+a Throw
+a TryCatchFinally
+a UnaryExpression
+a UnionDeclaration
+a UnionValue
+a WhileLoop

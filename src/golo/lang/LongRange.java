@@ -1,0 +1,98 @@
+package golo.lang;
+
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+
+final class LongRange extends AbstractRange<Long> {
+
+  LongRange(long from, long to) {
+    super(from, to);
+  }
+
+  LongRange(long to) {
+    super(to);
+  }
+
+  @Override
+  Long defaultValue() {
+    return 0L;
+  }
+
+  @Override
+  public Range<Long> reversed() {
+    return new LongRange(to(), from()).decrementBy(increment());
+  }
+
+  @Override
+  public int size() {
+    if (Objects.equals(to(), from())) {
+      return 0;
+    }
+    final int theSize = (int) ((to() - from()) / increment());
+    if (theSize < 0) {
+      return 0;
+    }
+    if (theSize == 0) {
+      return 1;
+    }
+    return theSize;
+  }
+
+  @Override
+  public boolean contains(Object o) {
+    if (!(o instanceof Long)) {
+      return false;
+    }
+    final Long obj = (Long) o;
+    return encloses(obj) && (obj - from()) % increment() == 0;
+  }
+
+  @Override
+  public Range<Long> tail() {
+    if (isEmpty()) {
+      return this;
+    }
+    return new LongRange(from() + increment(), to()).incrementBy(increment());
+  }
+
+  @Override
+  public Iterator<Long> iterator() {
+    return new AbstractRange.RangeIterator<Long>() {
+
+      private boolean started = false;
+      private long current = from();
+      private final long to = to();
+
+      @Override
+      public boolean hasNext() {
+        return Long.compare(to, current) * cmp() > 0;
+      }
+
+      @Override
+      public Long next() {
+        final long value = current;
+        if (started) {
+          if (hasNext()) {
+            current += increment();
+            return value;
+          } else {
+            throw new NoSuchElementException("iteration has finished");
+          }
+        } else {
+          started = true;
+          current += increment();
+          return value;
+        }
+      }
+    };
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Range<Long> newStartingFrom(Long newStart) {
+    return new LongRange(newStart, this.to()).incrementBy(this.increment());
+  }
+}

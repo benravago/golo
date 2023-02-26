@@ -1,0 +1,154 @@
+package golo.lang.ir;
+
+import java.util.Arrays;
+import java.util.List;
+
+import golo.runtime.InvalidDestructuringException;
+
+/**
+ * Represents a binary operation.
+ *
+ * @see OperatorType
+ */
+public final class BinaryOperation extends ExpressionStatement<BinaryOperation> {
+
+  private final OperatorType type;
+  private ExpressionStatement<?> leftExpression;
+  private ExpressionStatement<?> rightExpression;
+
+  private BinaryOperation(OperatorType type) {
+    super();
+    this.type = type;
+  }
+
+  /**
+   * Create a binary operation.
+   *
+   * @param type a {@link OperatorType} or a {@code String} representing the operator.
+   */
+  public static BinaryOperation of(Object type) {
+    return new BinaryOperation(OperatorType.of(type));
+  }
+
+  /**
+   * Full generic binary operation creation in one call.
+   *
+   * <p>Less readable than the fluent API, but useful when doing meta-generation
+   *
+   * @param type the type of the operation ({@link BinaryOperation#of(Object)})
+   * @param left the left expression.
+   * @param right the right expression.
+   * @return a configured binary operation.
+   */
+  public static BinaryOperation create(Object type, Object left, Object right) {
+    return of(type).left(left).right(right);
+  }
+
+  protected BinaryOperation self() {
+    return this;
+  }
+
+  public OperatorType getType() {
+    return type;
+  }
+
+  public ExpressionStatement<?> left() {
+    return leftExpression;
+  }
+
+  /**
+   * Define the left expression of this operation.
+   *
+   * <p>This is a builder method.
+   *
+   * @param expr the {@link golo.lang.ir.ExpressionStatement} to use as the left
+   * operand
+   * @return this operation
+   */
+  public BinaryOperation left(Object expr) {
+    this.leftExpression = makeParentOf(ExpressionStatement.of(expr));
+    return this;
+  }
+
+  /**
+   * Define the right expression of this operation.
+   *
+   * <p>This is a builder method.
+   *
+   * @param expr the {@link golo.lang.ir.ExpressionStatement} to use as the
+   * right operand
+   * @return this operation
+   */
+  public BinaryOperation right(Object expr) {
+    this.rightExpression = makeParentOf(ExpressionStatement.of(expr));
+    if (this.type == OperatorType.ELVIS_METHOD_CALL && this.rightExpression instanceof MethodInvocation) {
+      ((MethodInvocation) this.rightExpression).nullSafe(true);
+    }
+    return this;
+  }
+
+  public ExpressionStatement<?> right() {
+    return rightExpression;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("%s %s %s", leftExpression, type, rightExpression);
+  }
+
+  public boolean isMethodCall() {
+    return this.getType() == OperatorType.METHOD_CALL || this.getType() == OperatorType.ELVIS_METHOD_CALL
+        || this.getType() == OperatorType.ANON_CALL;
+  }
+
+  /**
+   * New style destructuring helper.
+   *
+   * <p>The destructuring must be to exactly two values. No remainer syntax is allowed.
+   * <p>The destructured values are the left and right expressions.
+   *
+   * @param number number of variable that will be affected.
+   * @param substruct whether the destructuring is complete or should contains a sub structure.
+   * @param toSkip a boolean array indicating the elements to skip.
+   * @return an array containing the values to assign.
+   */
+  public Object[] __$$_destruct(int number, boolean substruct, Object[] toSkip) {
+    if (number == 2 && !substruct) {
+      return new Object[] { leftExpression, rightExpression };
+    }
+    throw new InvalidDestructuringException("A BinaryOperation must destructure to exactly two values");
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void accept(GoloIrVisitor visitor) {
+    visitor.visitBinaryOperation(this);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public List<GoloElement<?>> children() {
+    return Arrays.asList(leftExpression, rightExpression);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  protected void replaceElement(GoloElement<?> original, GoloElement<?> newElement) {
+    if (!(newElement instanceof ExpressionStatement)) {
+      throw cantConvert("ExpressionStatement", newElement);
+    }
+    if (leftExpression.equals(original)) {
+      left(newElement);
+    } else if (rightExpression.equals(original)) {
+      right(newElement);
+    } else {
+      throw cantReplace(original, newElement);
+    }
+  }
+}
