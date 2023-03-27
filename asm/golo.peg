@@ -1,0 +1,161 @@
+
+CompilationUnit <- BlankLines ModuleDeclaration BlankLines (ImportDeclaration BlankLines)* (TopLevelDeclaration BlankLines)*
+
+ModuleDeclaration <- Documentation? 'module' QualifiedName
+
+ImportDeclaration <- 'import' QualifiedName
+
+QualifiedName <- IDENTIFIER ( '.' BlankLine? IDENTIFIER )*
+
+TopLevelDeclaration <- Documentation? ( AugmentDeclaration / ( 'local'? FunctionDeclaration ) / StructDeclaration )
+
+AugmentDeclaration <- 'augment' QualifiedName '{' BlankLines ( Documentation? FunctionDeclaration BlankLines )* '}'
+
+FunctionDeclaration <- 'function' ID '=' FunctionStmt
+
+StructDeclararation <- 'struct' ID '=' '{' BlankLines ID BlankLines (',' BlankLines ID BlankLines)* '}'
+  
+FunctionStmt <- ( '|' Arguments '...'? '|' )? ( Block | ( '->' BlankLine? ExpressionStatement ) )
+     
+Arguments <- ID ( ',' BlankLine? ID )*
+
+Block <- '{' Statement* '}'
+
+ExpressionStatement <- CommutativeExpression
+
+UnaryExpression <- 'not' CommutativeExpression;
+
+CommutativeExpression <- AssociativeExpression ( BlankLine? COMMUTATIVE_OPERATOR BlankLine? AssociativeExpression )*
+
+AssociativeExpression <- ( ( '(' BlankLine? CommutativeExpression BlankLine? ')' ) / TerminalExpression / UnaryExpression ) BlankLine? ( ( ASSOCIATIVE_OPERATOR BlankLine? AssociativeExpression ) / ( BlankLine? ( ':' | '?:' ) BlankLine? MethodInvocation ) )* BlankLine?
+
+???
+InvocationExpression after AssociativeExpression
+
+TerminalExpression <- Literal / FunctionInvocation / Reference / MatchStmt / FunctionStmt / CollectionLiteral 
+
+Literal <- ClassLiteral / StringLiteral / CharLiteral / FloatLiteral / DoubleLiteral / LongLiteral / IntegerLiteral / 'null' / 'true' / 'false' / FunctionRef
+
+FunctionInvocation <- QualifiedName '(' BlankLine? Expressions? ')' AnonymousFunctionInvocation*
+    
+Reference <- ID
+
+MatchStmt <- 'match' '{' BlankLines ( 'when' BlankLines ExpressionStatement BlankLines 'then' BlankLines ExpressionStatement BlankLines )+ 'otherwise'  BlankLines ExpressionStatement BlankLines '}'
+
+CollectionLiteral <- ('array' / 'list' / 'set' / 'map' / 'vector' / 'tuple' )? '[' BlankLine? ( ExpressionStatement ( ',' BlankLine? ExpressionStatement )* BlankLine? )? ']'
+
+StringLiteral <- '"' CHAR* '"' / MULTI_STRING
+CharLiteral <- ['] CHAR [']
+
+LongLiteral <- IntegerLiteral '_L'
+
+IntegerLiteral <- '-'? [0-9] ( '_'? [0-9] )*
+
+ClassLiteral <- QualifiedName '.' ( 'class' | 'module' )
+
+DoubleLiteral <- IntegerLiteral ( '.' [0-9] ( '_'? [0-9])* )? ('e' '-'? [0-9]+ )?
+
+FloatLiteral <- DoubleLiteral '_F'
+
+FunctionRef <- '^' ( QualifiedName '::' )? ID
+
+                       ????? 
+MethodInvocation <- ID =>'(' BlankLine? Expressions? ')' AnonymousFunctionInvocation*
+
+Expressions <- ExpressionStatement ( ',' BlankLine? ExpressionStatement )*
+    
+AnonymousFunctionInvocation <- '(' BlankLine? Expressions? ')'
+
+Statement <- BlankLine / Assignment / ExpressionStatement / ReturnStmt / LetOrVar / ConditionalBranching / WhileLoop / ForLoop / ForEachLoop / ThrowStmt / TryCatchFinally / CaseStmt / ContinueStmt / BreakStmt
+
+Assignment <- ID '=' BlankLine? ExpressionStatement
+
+ReturnStmt <- 'return' ( BlankLine? ExpressionStatement )?
+
+LetOrVar <- ( 'let' ID '=' BlankLine? ExpressionStatement ) / ( 'var' ID '=' BlankLine? ExpressionStatement )
+
+ConditionalBranching <- 'if' ExpressionStatement Block ( 'else' ( ConditionalBranching / Block ) )?
+
+WhileLoop <- 'while' ExpressionStatement Block
+
+ForLoop <- 'for' '(' BlankLine? LetOrVar ',' BlankLine? ExpressionStatement ',' BlankLine? Statement ')' Block
+
+ForEachLoop <- 'foreach' ( ( '(' ID 'in' ExpressionStatement ')' ) / ( ID 'in' ExpressionStatement ) ) Block 
+
+ThrowStmt <- 'throw' BlankLine? ExpressionStatement
+
+TryCatchFinally <- 'try' Block ( ( 'finally' Block ) / ( 'catch' '(' ID ')' Block ( 'finally' Block )? ) )
+     
+CaseStmt <- 'case' '{' BlankLines ( 'when' ExpressionStatement Block BlankLines )+ 'otherwise' Block BlankLines '}'
+
+ContinueStmt <- 'continue'
+
+BreakStmt <- 'break'
+
+Documentation <- ML_COMMENT
+
+BlankLines <- BlankLine*
+
+BlankLine <- NEWLINE / COMMENT
+
+NEWLINE <- '\n' / '\r' / '\r\n'
+
+WS <- ' ' / '\t' / '\r'   
+
+ASSOCIATIVE_OPERATOR <- ( '*' / '/' / '%' / '<' / '<=' / '==' / '!=' / '>' / '>=' / 'is' / 'isnt' / 'oftype' ) 
+
+COMMUTATIVE_OPERATOR <- ( '+' / '-' / 'and' / 'or' / 'orIfNull' )
+
+COMMENT <-  '#' ( !( '\n' / '\r' / '\r\n') )* ( '\n' / '\r' / '\r\n' )?
+
+COMMENT_SUFFIX <- ' ' | '\t'
+
+ID <- [']? LETTER ID_REST* 
+
+LETTER <- [A-Z] | [a-z] | '_' | '$'
+
+ID_REST <- LETTER | [0-9]
+
+CHAR <- !["\n\r\\] / ( '\\' [ntbrf'"\\] / ( 'u' [0-9a-f] [0-9a-f] [0-9a-f] [0-9a-f] ) )
+
+==========================================
+
+
+terminal ML_COMMENT: '----' -> '----' COMMENT_SUFFIX* NEWLINE;
+
+
+terminal STRING: "\"" (
+    !("\"" | "\\" | "\n" | "\r")
+    |
+    ("\\" ("n" | "t" | "b" | "r" | "f" | "\\" | "'" | "\"") )
+  )* "\"";
+
+terminal fragment MULTI_QUOTE: "\"\"\"";
+
+terminal MULTI_STRING : MULTI_QUOTE -> (!"\\" MULTI_QUOTE);
+
+/*terminal INVOCATION: ':' | '?:';*/
+
+
+
+
+
+
+/*QualifiedName:
+    elements+=IDENTIFIER ("." elements+=IDENTIFIER)*;*/
+
+=== unused ===
+terminal fragment SUPER: "super";             
+terminal fragment NEW: "new";
+terminal AUGMENT: ("augment" | "pimp");
+
+// Literals
+
+                                                                      ???????????????????????
+  < FUNREF: "^" (<IDENTIFIER> ("." <IDENTIFIER>)* "::")? <IDENTIFIER> ("\\" <NUMBER>("...")?)?>
+  < BIGINTEGER: <NUMBER> "_B" >
+  < BIGDECIMAL: <FLOATING_NUMBER> "_B" >
+
+
+
+
