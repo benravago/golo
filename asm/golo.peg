@@ -1,161 +1,324 @@
+# golo grammar
+
+CompilationUnit <-
+    BlankLines
+    ModuleDeclaration BlankLines
+    ( ImportDeclaration BlankLines )*
+    ( ( TopLevelDeclaration | VariableDeclaration ) BlankLines )*
+
+ModuleDeclaration <-
+    Documentation?
+    DecoratorDeclaration*
+    'module' QualifiedName
+
+ImportDeclaration <-
+    'import' '.'? QualifiedName MultiImport?
+
+TopLevelDeclaration <-
+    Documentation?
+    DecoratorDeclaration*
+    ( ( 'local'? FunctionDeclaration )
+      / StructDeclaration
+      / UnionDeclaration
+      / AugmentDeclaration
+      / NamedAugmentationDeclaration
+    )
+
+VariableDeclaration <-
+    ( 'let' / 'var' ) IDENTIFIER '=' BlankLine? ExpressionStatement
+
+DecoratorDeclaration <-
+    '@' '!'? ( InvocationExpression / Reference ) BlankLines
+
+FunctionDeclaration <-
+    ( 'function' / 'macro' ) IDENTIFIER '=' Function
+
+StructDeclaration <-
+    'struct' IDENTIFIER '=' '{' BlankLines
+        MemberDeclaration BlankLines ( ',' BlankLines MemberDeclaration BlankLines )*
+    '}'
+
+UnionDeclaration <-
+    'union' IDENTIFIER '=' '{' BlankLines
+        ( UnionValue BlankLines )*
+    '}'
+
+AugmentDeclaration <-
+    'augment' QualifiedName ( AugmentationDeclaration / ( 'with' AugmentationNames ) )
+
+NamedAugmentationDeclaration <-
+    'augmentation' IDENTIFIER '=' AugmentationDeclaration
+
+MemberDeclaration <-
+    Documentation? IDENTIFIER
+
+AugmentationNames <-
+    QualifiedName ( ',' BlankLine? QualifiedName )*
+
+AugmentationDeclaration <-
+    '{' BlankLines ( ( MacroInvocation / Augmentation ) BlankLines )* '}'
+
+Augmentation <- 
+    Documentation? DecoratorDeclaration* FunctionDeclaration
+
+MultiImport <-
+    '.' '{' BlankLine? QualifiedName ( ',' BlankLine? QualifiedName )+ BlankLine? '}'
+
+Reference <-
+    IDENTIFIER
+
+Function <-
+    ( '|' Parameters '...'? '|' )? ( Block / ( '->' BlankLine? ExpressionStatement ) )
+
+Block <-
+    '{' Statement* '}'
+
+Statement <-
+    BlankLine
+    / Assignment
+    / DestructuringAssignment
+    / VariableDeclaration
+    / ExpressionStatement
+    / Return
+    / ConditionalBranching
+    / WhileLoop
+    / ForLoop
+    / ForEachLoop
+    / Throw
+    / TryCatchFinally
+    / Case
+    / Continue
+    / Break
+
+Assignment <-
+    IDENTIFIER '=' BlankLine? ExpressionStatement
+
+DestructuringAssignment <-
+    ( 'let' / 'var' )? DestructuredNames '...'? '=' BlankLine? ExpressionStatement
+
+Return <-
+    'return' ( BlankLines ExpressionStatement )?
+
+ConditionalBranching <-
+    'if' ExpressionStatement Block ( 'else' ( ConditionalBranching / Block ) )?
 
-CompilationUnit <- BlankLines ModuleDeclaration BlankLines (ImportDeclaration BlankLines)* (TopLevelDeclaration BlankLines)*
+WhileLoop <-
+    'while' ExpressionStatement Block
 
-ModuleDeclaration <- Documentation? 'module' QualifiedName
+ForLoop <-
+    'for' '(' BlankLine?
+        VariableDeclaration ',' BlankLine?
+        ExpressionStatement ',' BlankLine?
+        Statement
+    ')' Block?
 
-ImportDeclaration <- 'import' QualifiedName
+ForEachLoop <-
+    'foreach' ( 
+        ForEachClause / ( '(' ForEachClause ')' ) 
+    ) Block?
 
-QualifiedName <- IDENTIFIER ( '.' BlankLine? IDENTIFIER )*
+ForEachClause <-
+    ( IDENTIFIER 'in' ExpressionStatement ( 'when' ExpressionStatement )? )
+    / ( DestructuredNames '...' 'in' ExpressionStatement ( 'when' ExpressionStatement )? )
 
-TopLevelDeclaration <- Documentation? ( AugmentDeclaration / ( 'local'? FunctionDeclaration ) / StructDeclaration )
+Throw <-
+    'throw' BlankLine? ExpressionStatement
 
-AugmentDeclaration <- 'augment' QualifiedName '{' BlankLines ( Documentation? FunctionDeclaration BlankLines )* '}'
+TryCatchFinally <-
+    'try' Block (
+      ( 'finally' Block )
+      / ( 'catch' '(' IDENTIFIER ')' Block ( 'finally' Block )? )
+    )
+
+Case <-
+    'case' '{' BlankLines
+        ( 'when' ExpressionStatement Block BlankLines )+
+        'otherwise' Block BlankLines
+    '}'
+
+Continue <-
+    'continue'
+
+Break <-
+    'break'
+
+LocalDeclaration <-
+    'with' '{'
+        ( Assignment
+          / DestructuringAssignment
+          / BlankLine
+        )+
+    '}'
+
+ExpressionStatement <-
+    OrIfNullExpression LocalDeclaration? BlankLine?
+
+OrIfNullExpression <-
+    OrExpression ( BlankLine? 'orIfNull' BlankLine? OrExpression )*
+
+OrExpression <-
+    AndExpression ( BlankLine? 'or' BlankLine? AndExpression )*
+
+AndExpression <-
+    EqualityExpression ( BlankLine? 'and' BlankLine? EqualityExpression )*
+
+EqualityExpression <-
+    RelationalExpression ( BlankLine? ( '==' | '!=' | 'is' | 'isnt' ) BlankLine? RelationalExpression )?
+
+RelationalExpression <-
+    AdditiveExpression ( BlankLine? ( '<' | '<=' | '>' | '>=' | 'oftype' ) BlankLine? AdditiveExpression )?
+
+AdditiveExpression <-
+    MultiplicativeExpression ( BlankLine? ( '+' / '-' ) BlankLine? MultiplicativeExpression )*
 
-FunctionDeclaration <- 'function' ID '=' FunctionStmt
+MultiplicativeExpression <-
+    UnaryExpression ( BlankLine? ( '*' / '/' / '%' ) BlankLine? InvocationExpression )*
 
-StructDeclararation <- 'struct' ID '=' '{' BlankLines ID BlankLines (',' BlankLines ID BlankLines)* '}'
-  
-FunctionStmt <- ( '|' Arguments '...'? '|' )? ( Block | ( '->' BlankLine? ExpressionStatement ) )
-     
-Arguments <- ID ( ',' BlankLine? ID )*
+UnaryExpression <-
+    'not'? InvocationExpression
+
+InvocationExpression <-
+    Atom
+    ( BlankLine? ( ':' / '?:' ) BlankLine? MethodInvocation )*
+    AnonymousFunctionInvocation*
+
+Atom <-
+    FunctionInvocation
+    / Reference
+    / MacroInvocation
+    / Match
+    / Literal
+    / Function
+    / CollectionLiteral
+    / '(' BlankLine? ExpressionStatement BlankLine? ')'
+
 
-Block <- '{' Statement* '}'
+MacroInvocation <-
+    '&' QualifiedName Arguments? ( Macro / Block )?
 
-ExpressionStatement <- CommutativeExpression
+Macro <-
+    '{' BlankLines
+        ( ( ImportDeclaration / ToplevelDeclaration ) BlankLines )+
+    BlankLines '}'
 
-UnaryExpression <- 'not' CommutativeExpression;
+FunctionInvocation <-
+    QualifiedName '!'? Arguments AnonymousFunctionInvocation*
 
-CommutativeExpression <- AssociativeExpression ( BlankLine? COMMUTATIVE_OPERATOR BlankLine? AssociativeExpression )*
+MethodInvocation <-
+    IDENTIFIER Arguments AnonymousFunctionInvocation*
 
-AssociativeExpression <- ( ( '(' BlankLine? CommutativeExpression BlankLine? ')' ) / TerminalExpression / UnaryExpression ) BlankLine? ( ( ASSOCIATIVE_OPERATOR BlankLine? AssociativeExpression ) / ( BlankLine? ( ':' | '?:' ) BlankLine? MethodInvocation ) )* BlankLine?
+AnonymousFunctionInvocation <-
+    '!'? Arguments
 
-???
-InvocationExpression after AssociativeExpression
+Arguments <-
+    '(' BlankLine? ( Argument ( ',' BlankLine? Argument )* )? ')'
 
-TerminalExpression <- Literal / FunctionInvocation / Reference / MatchStmt / FunctionStmt / CollectionLiteral 
+Argument <-
+    ( IDENTIFIER '=')? ExpressionStatement
 
-Literal <- ClassLiteral / StringLiteral / CharLiteral / FloatLiteral / DoubleLiteral / LongLiteral / IntegerLiteral / 'null' / 'true' / 'false' / FunctionRef
+Match <-
+    'match' '{' BlankLines
+        ( 'when' BlankLines ExpressionStatement BlankLines
+          'then' BlankLines ExpressionStatement BlankLines )+
+        'otherwise'  BlankLines ExpressionStatement BlankLines
+    '}'
 
-FunctionInvocation <- QualifiedName '(' BlankLine? Expressions? ')' AnonymousFunctionInvocation*
-    
-Reference <- ID
+Literal <-
+    ClassRef
+    / StringLiteral
+    / CharLiteral
+    / BigDecimalLiteral
+    / BigIntegerLiteral
+    / FloatLiteral
+    / DoubleLiteral
+    / LongLiteral
+    / IntegerLiteral
+    / 'null'
+    / 'true'
+    / 'false'
+    / FunctionRef
 
-MatchStmt <- 'match' '{' BlankLines ( 'when' BlankLines ExpressionStatement BlankLines 'then' BlankLines ExpressionStatement BlankLines )+ 'otherwise'  BlankLines ExpressionStatement BlankLines '}'
+StringLiteral <-
+    STRING | MULTI_STRING
 
-CollectionLiteral <- ('array' / 'list' / 'set' / 'map' / 'vector' / 'tuple' )? '[' BlankLine? ( ExpressionStatement ( ',' BlankLine? ExpressionStatement )* BlankLine? )? ']'
+CharLiteral <-
+    CHAR
 
-StringLiteral <- '"' CHAR* '"' / MULTI_STRING
-CharLiteral <- ['] CHAR [']
+BigDecimalLiteral <-
+    NUMBER_EXPONENT '_B'
 
-LongLiteral <- IntegerLiteral '_L'
+BigIntegerLiteral <-
+    NUMBER '_B'
 
-IntegerLiteral <- '-'? [0-9] ( '_'? [0-9] )*
+FloatLiteral <-
+    NUMBER_EXPONENT '_F'
 
-ClassLiteral <- QualifiedName '.' ( 'class' | 'module' )
+DoubleLiteral <-
+    NUMBER_EXPONENT
 
-DoubleLiteral <- IntegerLiteral ( '.' [0-9] ( '_'? [0-9])* )? ('e' '-'? [0-9]+ )?
+LongLiteral <-
+    NUMBER '_L'
 
-FloatLiteral <- DoubleLiteral '_F'
+IntegerLiteral <-
+    NUMBER
 
-FunctionRef <- '^' ( QualifiedName '::' )? ID
+ClassRef <-
+    IDENTIFIER ( '.' IDENTIFIER )* ( '.class' | '.module' )
 
-                       ????? 
-MethodInvocation <- ID =>'(' BlankLine? Expressions? ')' AnonymousFunctionInvocation*
+FunctionRef <-
+    '^' ( IDENTIFIER '.' IDENTIFIER )* '::')? IDENTIFIER ( '\\' NUMBER '...'? )?
 
-Expressions <- ExpressionStatement ( ',' BlankLine? ExpressionStatement )*
-    
-AnonymousFunctionInvocation <- '(' BlankLine? Expressions? ')'
+CollectionLiteral <-
+    ( 'array' / 'list' / 'set' / 'map' / 'vector' / 'tuple' )?
+    '[' BlankLine? Collection? ']'
 
-Statement <- BlankLine / Assignment / ExpressionStatement / ReturnStmt / LetOrVar / ConditionalBranching / WhileLoop / ForLoop / ForEachLoop / ThrowStmt / TryCatchFinally / CaseStmt / ContinueStmt / BreakStmt
+Collection <-
+    ExpressionStatement
+    ( ( ',' BlankLine? ExpressionStatement )+
+      / '..' ExpressionStatement
+      / ( ForEachLoop / ForLoop )+
+    )?
+    BlankLine?
 
-Assignment <- ID '=' BlankLine? ExpressionStatement
+Documentation <-
+    '----' !'----'* '----'
 
-ReturnStmt <- 'return' ( BlankLine? ExpressionStatement )?
+DestructuredNames <-
+    IDENTIFIER ( ',' BlankLine? IDENTIFIER )+
 
-LetOrVar <- ( 'let' ID '=' BlankLine? ExpressionStatement ) / ( 'var' ID '=' BlankLine? ExpressionStatement )
+QualifiedName <-
+    IDENTIFIER ( '.' IDENTIFIER )*
 
-ConditionalBranching <- 'if' ExpressionStatement Block ( 'else' ( ConditionalBranching / Block ) )?
+IDENTIFIER <-
+    [A-Za-z_$] [0-9A-Za-z_$]*
 
-WhileLoop <- 'while' ExpressionStatement Block
+BlankLines <-
+    BlankLine*
 
-ForLoop <- 'for' '(' BlankLine? LetOrVar ',' BlankLine? ExpressionStatement ',' BlankLine? Statement ')' Block
+BlankLine <-
+    NEWLINE / COMMENT
 
-ForEachLoop <- 'foreach' ( ( '(' ID 'in' ExpressionStatement ')' ) / ( ID 'in' ExpressionStatement ) ) Block 
+NEWLINE <-
+    '\n'
 
-ThrowStmt <- 'throw' BlankLine? ExpressionStatement
+COMMENT <-
+    '#' ![\n\r]* ( '\n' / '\r' / '\r\n' )?
 
-TryCatchFinally <- 'try' Block ( ( 'finally' Block ) / ( 'catch' '(' ID ')' Block ( 'finally' Block )? ) )
-     
-CaseStmt <- 'case' '{' BlankLines ( 'when' ExpressionStatement Block BlankLines )+ 'otherwise' Block BlankLines '}'
+STRING <-
+    '"' ( !["\n\r\\] / SPECIAL )* '"'
 
-ContinueStmt <- 'continue'
+CHAR <-
+    ['] ( !['\n\r\\] / SPECIAL ) [']
 
-BreakStmt <- 'break'
+SPECIAL <-
+    '\\' ( [ntbrf'"\\] / ( 'u' [0-9a-f] [0-9a-f] [0-9a-f] [0-9a-f] ) )
 
-Documentation <- ML_COMMENT
+NUMBER <-
+    '-'? [0-9] ( '_'? [0-9] )*
 
-BlankLines <- BlankLine*
+NUMBER_EXPONENT <-
+    NUMBER ( '.' [0-9] ( '_'? [0-9] )* )? ( 'e' '-'? [0-9]+ )?
 
-BlankLine <- NEWLINE / COMMENT
-
-NEWLINE <- '\n' / '\r' / '\r\n'
-
-WS <- ' ' / '\t' / '\r'   
-
-ASSOCIATIVE_OPERATOR <- ( '*' / '/' / '%' / '<' / '<=' / '==' / '!=' / '>' / '>=' / 'is' / 'isnt' / 'oftype' ) 
-
-COMMUTATIVE_OPERATOR <- ( '+' / '-' / 'and' / 'or' / 'orIfNull' )
-
-COMMENT <-  '#' ( !( '\n' / '\r' / '\r\n') )* ( '\n' / '\r' / '\r\n' )?
-
-COMMENT_SUFFIX <- ' ' | '\t'
-
-ID <- [']? LETTER ID_REST* 
-
-LETTER <- [A-Z] | [a-z] | '_' | '$'
-
-ID_REST <- LETTER | [0-9]
-
-CHAR <- !["\n\r\\] / ( '\\' [ntbrf'"\\] / ( 'u' [0-9a-f] [0-9a-f] [0-9a-f] [0-9a-f] ) )
-
-==========================================
-
-
-terminal ML_COMMENT: '----' -> '----' COMMENT_SUFFIX* NEWLINE;
-
-
-terminal STRING: "\"" (
-    !("\"" | "\\" | "\n" | "\r")
-    |
-    ("\\" ("n" | "t" | "b" | "r" | "f" | "\\" | "'" | "\"") )
-  )* "\"";
-
-terminal fragment MULTI_QUOTE: "\"\"\"";
-
-terminal MULTI_STRING : MULTI_QUOTE -> (!"\\" MULTI_QUOTE);
-
-/*terminal INVOCATION: ':' | '?:';*/
-
-
-
-
-
-
-/*QualifiedName:
-    elements+=IDENTIFIER ("." elements+=IDENTIFIER)*;*/
-
-=== unused ===
-terminal fragment SUPER: "super";             
-terminal fragment NEW: "new";
-terminal AUGMENT: ("augment" | "pimp");
-
-// Literals
-
-                                                                      ???????????????????????
-  < FUNREF: "^" (<IDENTIFIER> ("." <IDENTIFIER>)* "::")? <IDENTIFIER> ("\\" <NUMBER>("...")?)?>
-  < BIGINTEGER: <NUMBER> "_B" >
-  < BIGDECIMAL: <FLOATING_NUMBER> "_B" >
-
-
-
+MULTI_STRING <-
+    '"""' !'"""'+ '"""'
 
