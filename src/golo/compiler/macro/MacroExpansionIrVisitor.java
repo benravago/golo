@@ -1,19 +1,19 @@
 package golo.compiler.macro;
 
-import java.util.*;
-import java.lang.invoke.MethodHandle;
-import java.util.function.Function;
-
 import golo.compiler.GoloCompilationException;
 import golo.compiler.PositionInSourceCode;
 import golo.compiler.StopCompilationException;
 import golo.lang.ir.*;
 
-import static java.util.Objects.requireNonNull;
+import java.util.*;
+import java.lang.invoke.MethodHandle;
+import java.util.function.Function;
+
 import static golo.Metadata.GUIDE_BASE;
 import static golo.compiler.GoloCompilationException.Problem.Type.*;
 import static golo.lang.Messages.info;
 import static golo.lang.Messages.message;
+import static java.util.Objects.requireNonNull;
 
 /**
  * Visitor to expand macro calls.

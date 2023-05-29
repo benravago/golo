@@ -1,11 +1,10 @@
 package golo.doc;
 
-import java.util.*;
-
 import golo.compiler.GoloCompiler;
 import golo.compiler.PackageAndClass;
 import golo.lang.ir.*;
 
+import java.util.*;
 import java.io.File;
 
 public class ModuleDocumentation implements DocumentationElement {

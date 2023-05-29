@@ -1,11 +1,13 @@
 package golo.lang.ir;
 
+import golo.compiler.PositionInSourceCode;
+import golo.compiler.utils.SourceCodePosition;
+import golo.parser.Node;
+import golo.parser.Nodes;
+
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-
-import golo.compiler.PositionInSourceCode;
-import golo.parser.SimpleNode;
 
 import static java.util.stream.Collectors.toList;
 
@@ -28,10 +30,10 @@ public abstract class GoloElement<T extends GoloElement<T>> {
    *
    * @param node the {@link GoloASTNode} to reference.
    */
-  public final T ofAST(SimpleNode node) {
+  public final T ofAST(Node node) {
     if (node != null) {
-      this.documentation(node.getDocumentation());
-      this.positionInSourceCode(node.getPositionInSourceCode());
+      this.documentation(Nodes.getDocumentation(node));
+      this.positionInSourceCode(SourceCodePosition.of(node));
     }
     return self();
   }

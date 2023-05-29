@@ -1,20 +1,20 @@
 package golo.compiler;
 
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
+import org.ow2.asm.ClassWriter;
+import org.ow2.asm.FieldVisitor;
+import org.ow2.asm.Label;
+import org.ow2.asm.MethodVisitor;
 
 import golo.lang.ir.Member;
 import golo.lang.ir.Struct;
 
-import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
-import static org.objectweb.asm.Opcodes.*;
 import static golo.compiler.JavaBytecodeUtils.addAnnotations;
 import static golo.compiler.JavaBytecodeUtils.deprecatedFlag;
 import static golo.compiler.JavaBytecodeUtils.loadInteger;
 import static golo.lang.ir.Struct.IMMUTABLE_FACTORY_METHOD;
+import static org.ow2.asm.ClassWriter.COMPUTE_FRAMES;
+import static org.ow2.asm.ClassWriter.COMPUTE_MAXS;
+import static org.ow2.asm.Opcodes.*;
 
 class JavaBytecodeStructGenerator {
 

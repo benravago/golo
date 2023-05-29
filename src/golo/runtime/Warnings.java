@@ -5,9 +5,9 @@ import java.util.HashSet;
 
 import golo.lang.Tuple;
 
+import static golo.Metadata.GUIDE_BASE;
 import static golo.lang.Messages.message;
 import static golo.lang.Messages.warning;
-import static golo.Metadata.GUIDE_BASE;
 
 /**
  * A static class to deal with several kinds of warnings.

@@ -1,11 +1,10 @@
 package golo.compiler;
 
-import golo.compiler.macro.MacroExpansionIrVisitor;
 import golo.parser.ast.CompilationUnit;
-//import golo.parser.GoloOffsetParser;
+import golo.compiler.macro.MacroExpansionIrVisitor;
+import golo.lang.ir.GoloModule;
 import golo.parser.GoloParser;
 import golo.parser.ParseException;
-import golo.lang.ir.GoloModule;
 
 import java.io.*;
 import java.util.Collections;
@@ -67,7 +66,7 @@ public final class GoloCompiler {
     if (this.parser == null) {
       this.parser = createGoloParser(sourceReader);
     } else {
-      this.parser.ReInit(sourceReader);
+      this.parser.reInit(sourceReader);
     }
     return this.parser;
   }
@@ -121,7 +120,7 @@ public final class GoloCompiler {
     parser.exceptionBuilder = getOrCreateExceptionBuilder(goloSourceFilename);
     try {
       compilationUnit = parser.CompilationUnit();
-      compilationUnit.setFilename(goloSourceFilename);
+      compilationUnit.fileName = goloSourceFilename;
     } catch (ParseException pe) {
       exceptionBuilder.report(pe, compilationUnit);
     }
@@ -195,6 +194,6 @@ public final class GoloCompiler {
    * @return the parser for <code>sourceReader</code>.
    */
   private GoloParser createGoloParser(Reader sourceReader) {
-    return GoloParser.of(sourceReader); // GoloOffsetParser(sourceReader);
+    return GoloParser.offsetParser(sourceReader);
   }
 }

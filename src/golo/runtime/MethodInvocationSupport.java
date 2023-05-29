@@ -1,12 +1,12 @@
 package golo.runtime;
 
-import golo.lang.DynamicObject;
-
 import java.lang.invoke.*;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.WeakHashMap;
+
+import golo.lang.DynamicObject;
 
 import static java.lang.invoke.MethodHandles.*;
 import static java.lang.invoke.MethodType.methodType;

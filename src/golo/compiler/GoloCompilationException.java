@@ -1,12 +1,13 @@
 package golo.compiler;
 
+import golo.parser.Node;
+import golo.compiler.utils.SourceCodePosition;
+import golo.lang.ir.GoloElement;
+import golo.parser.ParseException;
+
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.LinkedList;
 import java.util.List;
-
-import golo.parser.SimpleNode;
-import golo.parser.ParseException;
-import golo.lang.ir.GoloElement;
 
 import static golo.lang.Messages.message;
 import static java.util.Collections.unmodifiableList;
@@ -117,9 +118,9 @@ public class GoloCompilationException extends RuntimeException {
      * @param description the problem description.
      * @return the same builder object.
      */
-    public Builder report(Problem.Type type, SimpleNode source, String description) {
+    public Builder report(Problem.Type type, Node source, String description) {
       exception.report(
-          new Problem(type, source != null ? source.getPositionInSourceCode() : null, description, source, null));
+          new Problem(type, source != null ? SourceCodePosition.of(source) : null, description, source, null));
       return this;
     }
 
@@ -159,7 +160,7 @@ public class GoloCompilationException extends RuntimeException {
      * @param source the node of the {@code ParseException}.
      * @return the same builder object.
      */
-    public Builder report(ParseException pe, SimpleNode source) {
+    public Builder report(ParseException pe, Node source) {
       exception.report(new Problem(Problem.Type.PARSING, PositionInSourceCode.of(pe.currentToken.beginLine,
           pe.currentToken.beginColumn, pe.currentToken.endLine, pe.currentToken.endColumn), pe.getMessage(), source,
           pe));

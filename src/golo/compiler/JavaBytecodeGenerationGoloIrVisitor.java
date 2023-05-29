@@ -1,6 +1,6 @@
 package golo.compiler;
 
-import org.objectweb.asm.*;
+import org.ow2.asm.*;
 
 import golo.lang.FunctionReference;
 import golo.lang.ir.*;
@@ -12,9 +12,9 @@ import java.util.*;
 
 import static java.lang.invoke.MethodType.genericMethodType;
 import static java.lang.invoke.MethodType.methodType;
-import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
-import static org.objectweb.asm.Opcodes.*;
+import static org.ow2.asm.ClassWriter.COMPUTE_FRAMES;
+import static org.ow2.asm.ClassWriter.COMPUTE_MAXS;
+import static org.ow2.asm.Opcodes.*;
 import static golo.compiler.JavaBytecodeUtils.*;
 import static golo.lang.Messages.*;
 import static golo.lang.ir.TryCatchFinally.DUMMY_TRY_RESULT_VARIABLE;

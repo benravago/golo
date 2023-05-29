@@ -1,17 +1,17 @@
 package golo.compiler;
 
-import org.objectweb.asm.Label;
-import org.objectweb.asm.Type;
+import org.ow2.asm.Label;
+import org.ow2.asm.Type;
 
 import golo.lang.Tuple;
 import golo.lang.ir.GoloElement;
 
-import org.objectweb.asm.MethodVisitor;
+import org.ow2.asm.MethodVisitor;
 import java.util.Map;
 import java.util.function.BiFunction;
-import org.objectweb.asm.AnnotationVisitor;
+import org.ow2.asm.AnnotationVisitor;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.ow2.asm.Opcodes.*;
 
 final class JavaBytecodeUtils {
 

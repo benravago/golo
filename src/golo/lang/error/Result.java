@@ -678,7 +678,7 @@ public final class Result<T, E extends Throwable> implements Iterable<T> {
    * members of the structure.
    *
    * <p>The destructuring must be to exactly two values. No remainer syntax is allowed.
-
+  
    * @param number number of variable that will be affected.
    * @param substruct whether the destructuring is complete or should contains a sub structure.
    * @param toSkip a boolean array indicating the elements to skip.

@@ -1,9 +1,9 @@
 package golo.runtime.adapters;
 
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Type;
+import org.ow2.asm.ClassWriter;
+import org.ow2.asm.Handle;
+import org.ow2.asm.MethodVisitor;
+import org.ow2.asm.Type;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -16,9 +16,9 @@ import java.util.TreeSet;
 
 import static golo.runtime.adapters.AdapterSupport.DEFINITION_FIELD;
 import static java.lang.reflect.Modifier.*;
-import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
-import static org.objectweb.asm.Opcodes.*;
+import static org.ow2.asm.ClassWriter.COMPUTE_FRAMES;
+import static org.ow2.asm.ClassWriter.COMPUTE_MAXS;
+import static org.ow2.asm.Opcodes.*;
 
 public class JavaBytecodeAdapterGenerator {
 

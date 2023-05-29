@@ -1,8 +1,8 @@
 package golo.compiler;
 
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
+import org.ow2.asm.ClassWriter;
+import org.ow2.asm.Label;
+import org.ow2.asm.MethodVisitor;
 
 import golo.lang.ir.Member;
 import golo.lang.ir.Union;
@@ -16,9 +16,9 @@ import java.util.HashMap;
 import static golo.compiler.JavaBytecodeUtils.addAnnotations;
 import static golo.compiler.JavaBytecodeUtils.deprecatedFlag;
 import static golo.compiler.JavaBytecodeUtils.loadInteger;
-import static org.objectweb.asm.ClassWriter.COMPUTE_FRAMES;
-import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
-import static org.objectweb.asm.Opcodes.*;
+import static org.ow2.asm.ClassWriter.COMPUTE_FRAMES;
+import static org.ow2.asm.ClassWriter.COMPUTE_MAXS;
+import static org.ow2.asm.Opcodes.*;
 
 class JavaBytecodeUnionGenerator {
 

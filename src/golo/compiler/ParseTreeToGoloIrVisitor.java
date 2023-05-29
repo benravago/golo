@@ -1,30 +1,19 @@
 package golo.compiler;
 
+import golo.compiler.utils.SourceCodePosition;
+import golo.lang.ir.*;
+import golo.parser.*;
+
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import golo.parser.*;
-import golo.parser.ast.*;
-
-import golo.lang.ir.Block;
-import golo.lang.ir.CollectionLiteral;
-import golo.lang.ir.ConditionalBranching;
-import golo.lang.ir.DestructuringAssignment;
-import golo.lang.ir.ExpressionStatement;
-import golo.lang.ir.FunctionInvocation;
-import golo.lang.ir.MacroInvocation;
-import golo.lang.ir.MethodInvocation;
-import golo.lang.ir.TryCatchFinally;
-import golo.lang.ir.UnionValue;
-import golo.lang.ir.*;
-
-import static java.util.Collections.nCopies;
 import static golo.compiler.GoloCompilationException.Problem.Type.*;
 import static golo.lang.Messages.message;
+import static java.util.Collections.nCopies;
 
-public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
+public class ParseTreeToGoloIrVisitor implements ParserVisitor {
 
   public ParseTreeToGoloIrVisitor() {
   }
@@ -33,7 +22,7 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   public Object visit(ParseError node, Object data) {
     return null;
   }
-
+  
   private static final class Context {
     public GoloModule module;
     private final Deque<FunctionContainer> functionContainersStack = new LinkedList<>();
@@ -108,8 +97,8 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       return module;
     }
 
-    public void enterAugmentation(AugmentDeclaration node) {
-      functionContainersStack.push(Augmentation.of(node.getTarget()).with(node.getAugmentationNames()).ofAST(node));
+    public void enterAugmentation(golo.parser.ast.AugmentDeclaration node) {
+      functionContainersStack.push(Augmentation.of(node.target).with(node.augmentationNames).ofAST(node));
       mustAddFunction = true;
       newObjectStack();
     }
@@ -128,8 +117,8 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       mustAddFunction = !inMacroInvocation();
     }
 
-    public void enterNamedAugmentation(NamedAugmentationDeclaration node) {
-      NamedAugmentation namedAugmentation = NamedAugmentation.of(node.getName()).ofAST(node);
+    public void enterNamedAugmentation(golo.parser.ast.NamedAugmentationDeclaration node) {
+      NamedAugmentation namedAugmentation = NamedAugmentation.of(node.name).ofAST(node);
       functionContainersStack.push(namedAugmentation);
       mustAddFunction = true;
       newObjectStack();
@@ -179,14 +168,14 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       return topLevel;
     }
 
-    public <N extends NamedNode, T extends GoloElement<T>> void addType(N node, T type) {
+    public <N extends Node, T extends GoloElement<T>> void addType(N node, T type) {
       T converted = decoratorsAsMacroCalls(type);
       if (converted == null) {
         return;
       }
       if (inMacroInvocation()) {
         this.push(converted);
-      } else if (!checkExistingSubtype(node, node.getName())) {
+      } else if (!checkExistingSubtype(node, Nodes.getName(node))) {
         module.add(converted);
       }
     }
@@ -217,7 +206,7 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       }
     }
 
-    public boolean checkExistingSubtype(SimpleNode node, String name) {
+    public boolean checkExistingSubtype(Node node, String name) {
       GoloElement<?> existing = module.getSubtypeByName(name);
       if (existing != null) {
         errorMessage(AMBIGUOUS_DECLARATION, node,
@@ -234,30 +223,32 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       return (GoloFunction) peek();
     }
 
-    private LocalReference.Kind referenceKindOf(LetOrVar.Type type, boolean moduleState) {
+    private LocalReference.Kind referenceKindOf(golo.parser.ast.LetOrVar.Type type, boolean moduleState) {
       if (moduleState) {
-        return type == LetOrVar.Type.LET ? LocalReference.Kind.MODULE_CONSTANT : LocalReference.Kind.MODULE_VARIABLE;
+        return type == golo.parser.ast.LetOrVar.Type.LET ? LocalReference.Kind.MODULE_CONSTANT
+            : LocalReference.Kind.MODULE_VARIABLE;
       } else {
-        return type == LetOrVar.Type.LET ? LocalReference.Kind.CONSTANT : LocalReference.Kind.VARIABLE;
+        return type == golo.parser.ast.LetOrVar.Type.LET ? LocalReference.Kind.CONSTANT : LocalReference.Kind.VARIABLE;
       }
     }
 
-    public LocalReference getOrCreateReference(LetOrVar node) {
-      return getOrCreateReference(node.getType(), node.getName(), node.isModuleState(), node);
+    public LocalReference getOrCreateReference(golo.parser.ast.LetOrVar node) {
+      return getOrCreateReference(node.type, node.name, node.isModule, node);
     }
 
     public LocalReference getOrCreateReference(golo.parser.ast.DestructuringAssignment node, String name) {
-      return getOrCreateReference(node.getType(), name, false, node);
+      return getOrCreateReference(node.type, name, false, node);
     }
 
-    public LocalReference getReference(String name, SimpleNode node) {
+    public LocalReference getReference(String name, Node node) {
       if (inLocalDeclaration) {
-        return getOrCreateReference(LetOrVar.Type.LET, name, false, node);
+        return getOrCreateReference(golo.parser.ast.LetOrVar.Type.LET, name, false, node);
       }
       return referenceTableStack.peek().get(name);
     }
 
-    private LocalReference getOrCreateReference(LetOrVar.Type type, String name, boolean module, SimpleNode node) {
+    private LocalReference getOrCreateReference(golo.parser.ast.LetOrVar.Type type, String name, boolean module,
+        Node node) {
       if (type != null) {
         LocalReference val = LocalReference.of(name).kind(referenceKindOf(type, module)).ofAST(node);
         if (!inLocalDeclaration) {
@@ -283,8 +274,8 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       return message + ' ' + message("source_position", position.getStartLine(), position.getStartColumn());
     }
 
-    public void errorMessage(GoloCompilationException.Problem.Type type, SimpleNode node, String message) {
-      getOrCreateExceptionBuilder().report(type, node, errorDescription(node.getPositionInSourceCode(), message));
+    public void errorMessage(GoloCompilationException.Problem.Type type, Node node, String message) {
+      getOrCreateExceptionBuilder().report(type, node, errorDescription(SourceCodePosition.of(node), message));
     }
 
     public void errorMessage(GoloCompilationException.Problem.Type type, GoloElement<?> node, String message) {
@@ -292,70 +283,71 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
     }
   }
 
-  public GoloModule transform(CompilationUnit compilationUnit, GoloCompilationException.Builder builder) {
+  public GoloModule transform(golo.parser.ast.CompilationUnit compilationUnit,
+      GoloCompilationException.Builder builder) {
     Context context = new Context();
     context.newObjectStack();
     context.setExceptionBuilder(builder);
     visit(compilationUnit, context);
-    return context.module.sourceFile(compilationUnit.getFilename());
+    return context.module.sourceFile(compilationUnit.fileName);
   }
 
   @Override
-  public Object visit(SimpleNode node, Object data) {
+  public Object visit(Node node, Object data) {
     throw new IllegalStateException("visit(SimpleNode) shall never be invoked: " + node.getClass());
   }
 
   @Override
-  public Object visit(CompilationUnit node, Object data) {
-    return node.childrenAccept(this, data);
+  public Object visit(golo.parser.ast.CompilationUnit node, Object data) {
+    return this.visitAll(node, data);
   }
 
   @Override
-  public Object visit(ModuleDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.ModuleDeclaration node, Object data) {
     Context context = (Context) data;
-    GoloModule module = context.createModule(node.getName()).ofAST(node);
-    node.childrenAccept(this, data);
+    GoloModule module = context.createModule(node.name).ofAST(node);
+    this.visitAll(node, data);
     module.decoratorMacro(context.convertDecoratorsAsMacroCalls(module));
     return data;
   }
 
   @Override
-  public Object visit(ImportDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.ImportDeclaration node, Object data) {
     Context context = (Context) data;
     PackageAndClass name;
-    if (node.isRelative()) {
-      name = context.module.getPackageAndClass().createSiblingClass(node.getName());
+    if (node.isRelative) {
+      name = context.module.getPackageAndClass().createSiblingClass(node.name);
     } else {
-      name = PackageAndClass.of(node.getName());
+      name = PackageAndClass.of(node.name);
     }
-    if (node.getMultiple().isEmpty()) {
+    if (node.multiples.isEmpty()) {
       context.addImport(ModuleImport.of(name).ofAST(node));
     } else {
-      for (String sub : node.getMultiple()) {
+      for (String sub : node.multiples) {
         context.addImport(ModuleImport.of(name.createSubPackage(sub)).ofAST(node));
       }
     }
-    return node.childrenAccept(this, data);
+    return this.visitAll(node, data);
   }
 
   @Override
-  public Object visit(ToplevelDeclaration node, Object data) {
-    return node.childrenAccept(this, data);
+  public Object visit(golo.parser.ast.TopLevelDeclaration node, Object data) {
+    return this.visitAll(node, data);
   }
 
   @Override
-  public Object visit(MemberDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.MemberDeclaration node, Object data) {
     Context context = (Context) data;
-    context.push(Member.of(node.getName()).ofAST(node));
+    context.push(Member.of(node.name).ofAST(node));
     return context;
   }
 
   @Override
-  public Object visit(StructDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.StructDeclaration node, Object data) {
     Context context = (Context) data;
-    Struct theStruct = Struct.struct(node.getName()).ofAST(node);
-    for (int i = 0; i < node.getNumChildren(); i++) {
-      node.getChild(i).accept(this, context);
+    Struct theStruct = Struct.struct(node.name).ofAST(node);
+    for (int i = 0; i < node.children.length; i++) {
+      this.visit(node.children[i], context);
       theStruct.withMember(context.pop());
     }
     context.addType(node, theStruct);
@@ -363,10 +355,10 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(UnionDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.UnionDeclaration node, Object data) {
     Context context = (Context) data;
-    context.push(Union.union(node.getName()).ofAST(node));
-    node.childrenAccept(this, data);
+    context.push(Union.union(node.name).ofAST(node));
+    this.visitAll(node, data);
     context.addType(node, (Union) context.pop());
     return data;
   }
@@ -374,9 +366,9 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   @Override
   public Object visit(golo.parser.ast.UnionValue node, Object data) {
     Context context = (Context) data;
-    UnionValue value = new UnionValue(node.getName()).ofAST(node);
-    for (int i = 0; i < node.getNumChildren(); i++) {
-      node.getChild(i).accept(this, context);
+    UnionValue value = new UnionValue(node.name).ofAST(node);
+    for (int i = 0; i < node.children.length; i++) {
+      this.visit(node.children[i], context);
       if (context.peek() instanceof Member) {
         value.withMember(context.pop());
       }
@@ -386,53 +378,53 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
     if (decoLike != null) {
       currentUnion.addMacroInvocation(decoLike);
     } else if (!currentUnion.addValue(value)) {
-      context.errorMessage(AMBIGUOUS_DECLARATION, node, message("ambiguous_unionvalue_declaration", node.getName()));
+      context.errorMessage(AMBIGUOUS_DECLARATION, node, message("ambiguous_unionvalue_declaration", node.name));
     }
     return data;
   }
 
   @Override
-  public Object visit(AugmentDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.AugmentDeclaration node, Object data) {
     Context context = (Context) data;
     context.enterAugmentation(node);
-    node.childrenAccept(this, data);
+    this.visitAll(node, data);
     context.leaveAugmentation();
     return data;
   }
 
   @Override
-  public Object visit(DecoratorDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.DecoratorDeclaration node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
-    context.push(Decorator.of(context.pop()).constant(node.isConstant()).ofAST(node));
+    this.visitAll(node, data);
+    context.push(Decorator.of(context.pop()).constant(node.isConstant).ofAST(node));
     return data;
   }
 
   @Override
-  public Object visit(NamedAugmentationDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.NamedAugmentationDeclaration node, Object data) {
     Context context = (Context) data;
     context.enterNamedAugmentation(node);
-    node.childrenAccept(this, data);
+    this.visitAll(node, data);
     context.leaveNamedAugmentation();
     return data;
   }
 
   @Override
-  public Object visit(FunctionDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.FunctionDeclaration node, Object data) {
     Context context = (Context) data;
-    GoloFunction function = GoloFunction.function(node.getName()).ofAST(node).local(node.isLocal())
-        .inAugment(node.isAugmentation()).decorator(node.isDecorator()).asMacro(node.isMacro());
+    GoloFunction function = GoloFunction.function(node.name).ofAST(node).local(node.isLocal)
+        .inAugment(node.isAugmentation).decorator(node.isDecorator).asMacro(node.isMacro);
     while (context.peek() instanceof Decorator) {
       function.decoratedWith(context.pop());
     }
     context.push(function);
-    node.childrenAccept(this, data);
+    this.visitAll(node, data);
     context.pop();
     return data;
   }
 
   @Override
-  public Object visit(Continue node, Object data) {
+  public Object visit(golo.parser.ast.Continue node, Object data) {
     Context context = (Context) data;
     LoopBreakFlowStatement statement = LoopBreakFlowStatement.newContinue().ofAST(node);
     context.push(statement);
@@ -440,7 +432,7 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(Break node, Object data) {
+  public Object visit(golo.parser.ast.Break node, Object data) {
     Context context = (Context) data;
     LoopBreakFlowStatement statement = LoopBreakFlowStatement.newBreak().ofAST(node);
     context.push(statement);
@@ -448,19 +440,19 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(Function node, Object data) {
+  public Object visit(golo.parser.ast.Function node, Object data) {
     Context context = (Context) data;
-    GoloFunction function = context.getOrCreateFunction().ofAST(node).varargs(node.isVarargs())
-        .withParameters(node.getParameters());
+    GoloFunction function = context.getOrCreateFunction().ofAST(node).varargs(node.isVarargs)
+        .withParameters(node.parameters);
 
-    if (node.isCompactForm()) {
+    if (node.isCompactForm) {
       // TODO: refactor
-      SimpleNode astChild = node.getChild(0);
-      Return astReturn = new Return(0);
-      astReturn.addChild(astChild, 0);
-      var astBlock = new golo.parser.ast.Block(0);
-      astBlock.addChild(astReturn, 0);
-      astBlock.accept(this, data);
+      Node astChild = node.children[0];
+      golo.parser.ast.Return astReturn = new golo.parser.ast.Return();
+      Nodes.set(astReturn, astChild, 0);
+      golo.parser.ast.Block astBlock = new golo.parser.ast.Block();
+      Nodes.set(astBlock, astReturn, 0);
+      this.visit(astBlock, data);
       // FIXME ?
       // if (function.isSynthetic()) {
       //   context.pop();
@@ -469,7 +461,7 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       // function.block(returns(context.pop()));
       // context.push(function.getBlock());
     } else {
-      node.childrenAccept(this, data);
+      this.visitAll(node, data);
     }
     if (function.isSynthetic()) {
       context.pop();
@@ -482,33 +474,33 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(UnaryExpression node, Object data) {
+  public Object visit(golo.parser.ast.UnaryExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
-    context.push(UnaryOperation.create(node.getOperator(), context.pop()).ofAST(node));
+    this.visitAll(node, data);
+    context.push(UnaryOperation.create(node.operator, context.pop()).ofAST(node));
     return data;
   }
 
   @Override
-  public Object visit(Literal node, Object data) {
+  public Object visit(golo.parser.ast.Literal node, Object data) {
     Context context = (Context) data;
-    ConstantStatement constantStatement = ConstantStatement.of(node.getLiteralValue()).ofAST(node);
+    ConstantStatement constantStatement = ConstantStatement.of(node.literalValue).ofAST(node);
     context.push(constantStatement);
     return data;
   }
 
   @Override
   public Object visit(golo.parser.ast.CollectionLiteral node, Object data) {
-    if (node.isComprehension()) {
+    if (node.isComprehension) {
       return createCollectionComprehension(node, (Context) data);
     }
     return createCollectionLiteral(node, (Context) data);
   }
 
   private Object createCollectionLiteral(golo.parser.ast.CollectionLiteral node, Context context) {
-    CollectionLiteral collection = CollectionLiteral.create(node.getType()).ofAST(node);
-    for (int i = 0; i < node.getNumChildren(); i++) {
-      node.getChild(i).accept(this, context);
+    CollectionLiteral collection = CollectionLiteral.create(node.type).ofAST(node);
+    for (int i = 0; i < node.children.length; i++) {
+      this.visit(node.children[i], context);
       collection.add(context.pop());
     }
     context.push(collection);
@@ -516,11 +508,11 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   private Object createCollectionComprehension(golo.parser.ast.CollectionLiteral node, Context context) {
-    CollectionComprehension col = CollectionComprehension.of(node.getType()).ofAST(node);
-    node.getChild(0).accept(this, context);
+    CollectionComprehension col = CollectionComprehension.of(node.type).ofAST(node);
+    this.visit(node.children[0], context);
     col.expression(context.pop());
-    for (int i = 1; i < node.getNumChildren(); i++) {
-      node.getChild(i).accept(this, context);
+    for (int i = 1; i < node.children.length; i++) {
+      this.visit(node.children[i], context);
       col.loop(((Block) context.pop()).getStatements().get(0));
     }
     context.push(col);
@@ -528,18 +520,18 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(Reference node, Object data) {
-    ((Context) data).push(ReferenceLookup.of(node.getName()).ofAST(node));
+  public Object visit(golo.parser.ast.Reference node, Object data) {
+    ((Context) data).push(ReferenceLookup.of(node.name).ofAST(node));
     return data;
   }
 
   @Override
-  public Object visit(LetOrVar node, Object data) {
+  public Object visit(golo.parser.ast.LetOrVar node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
+    this.visitAll(node, data);
     AssignmentStatement assignmentStatement = AssignmentStatement
         .create(context.getOrCreateReference(node), context.pop(), true).ofAST(node);
-    if (node.isModuleState()) {
+    if (node.isModule) {
       context.module.add(assignmentStatement);
     } else {
       context.push(assignmentStatement);
@@ -548,12 +540,12 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(Assignment node, Object data) {
+  public Object visit(golo.parser.ast.Assignment node, Object data) {
     Context context = (Context) data;
-    LocalReference reference = context.getReference(node.getName(), node);
-    node.childrenAccept(this, data);
+    LocalReference reference = context.getReference(node.name, node);
+    this.visitAll(node, data);
     if (reference == null) {
-      context.errorMessage(UNDECLARED_REFERENCE, node, message("undeclared_reference_assignment", node.getName()));
+      context.errorMessage(UNDECLARED_REFERENCE, node, message("undeclared_reference_assignment", node.name));
     } else {
       context.push(AssignmentStatement.create(reference, context.pop(), false).ofAST(node));
     }
@@ -563,12 +555,12 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   @Override
   public Object visit(golo.parser.ast.DestructuringAssignment node, Object data) {
     Context context = (Context) data;
-    node.getChild(0).accept(this, data);
+    this.visit(node.children[0], data);
 
-    var builder = golo.lang.ir.DestructuringAssignment.destruct(context.pop()).ofAST(node)
-        .declaring(node.getType() != null).varargs(node.isVarargs());
+    DestructuringAssignment builder = DestructuringAssignment.destruct(context.pop()).ofAST(node)
+        .declaring(node.type != null).varargs(node.isVarargs);
 
-    for (String name : node.getNames()) {
+    for (String name : node.names) {
       LocalReference val = context.getOrCreateReference(node, name);
       if (val != null) {
         builder.to(val);
@@ -579,10 +571,10 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(Return node, Object data) {
+  public Object visit(golo.parser.ast.Return node, Object data) {
     Context context = (Context) data;
-    if (node.getNumChildren() > 0) {
-      node.childrenAccept(this, data);
+    if (node.children.length > 0) {
+      this.visitAll(node, data);
     } else {
       context.push(ConstantStatement.of(null));
     }
@@ -591,17 +583,18 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(Argument node, Object data) {
+  public Object visit(golo.parser.ast.Argument node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
-    context.push(node.isNamed() ? NamedArgument.of(node.getName(), context.pop()) : context.pop());
+    this.visitAll(node, data);
+    var name = Nodes.getName(node);
+    context.push(name != null ? NamedArgument.of(name, context.pop()) : context.pop());
     return data;
   }
 
   @Override
-  public Object visit(Throw node, Object data) {
+  public Object visit(golo.parser.ast.Throw node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
+    this.visitAll(node, data);
     context.push(ThrowStatement.of(context.pop()).ofAST(node));
     return data;
   }
@@ -618,9 +611,9 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
       }
     }
     context.push(block);
-    for (int i = 0; i < node.getNumChildren(); i++) {
-      SimpleNode child = (SimpleNode) node.getChild(i);
-      child.accept(this, data);
+    for (int i = 0; i < node.children.length; i++) {
+      Node child = (Node) node.children[i];
+      this.visit(child, data);
       GoloStatement<?> statement = (GoloStatement) context.pop();
       block.add(statement);
     }
@@ -632,23 +625,23 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   public Object visit(golo.parser.ast.FunctionInvocation node, Object data) {
     Context context = (Context) data;
     context
-        .push(visitAbstractInvocation(data, node, FunctionInvocation.of(node.getName()).constant(node.isConstant())));
+        .push(visitAbstractInvocation(data, node, FunctionInvocation.of(node.name).constant(node.isConstant)));
     return data;
   }
 
   @Override
   public Object visit(golo.parser.ast.MethodInvocation node, Object data) {
     Context context = (Context) data;
-    context.push(visitAbstractInvocation(data, node, MethodInvocation.invoke(node.getName())));
+    context.push(visitAbstractInvocation(data, node, MethodInvocation.invoke(node.name)));
     return data;
   }
 
   @Override
-  public Object visit(AnonymousFunctionInvocation node, Object data) {
+  public Object visit(golo.parser.ast.AnonymousFunctionInvocation node, Object data) {
     Context context = (Context) data;
     ExpressionStatement<?> result = visitAbstractInvocation(data, node,
-        FunctionInvocation.of(null).constant(node.isConstant()));
-    if (node.isOnExpression()) {
+        FunctionInvocation.of(null).constant(node.isConstant));
+    if (node.isOnExpression) {
       context.push(ExpressionStatement.of(context.pop()).call(result));
     } else {
       context.push(result);
@@ -656,7 +649,7 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
     return data;
   }
 
-  private void checkNamedArgument(Context context, SimpleNode node, AbstractInvocation<?> invocation,
+  private void checkNamedArgument(Context context, Node node, AbstractInvocation<?> invocation,
       ExpressionStatement<?> statement) {
     if (statement instanceof NamedArgument) {
       if (!invocation.namedArgumentsComplete()) {
@@ -670,29 +663,29 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   @Override
   public Object visit(golo.parser.ast.MacroInvocation node, Object data) {
     Context context = (Context) data;
-    context.enterMacroInvocation(MacroInvocation.call(node.getName()).ofAST(node));
-    final int numChildren = node.getNumChildren();
+    context.enterMacroInvocation(MacroInvocation.call(node.name).ofAST(node));
+    final int numChildren = node.children.length;
     for (int i = 0; i < numChildren; i++) {
-      SimpleNode argumentNode = (SimpleNode) node.getChild(i);
-      argumentNode.accept(this, data);
+      Node argumentNode = (Node) node.children[i];
+      this.visit(argumentNode, data);
       context.currentMacroInvocation().withArgs(context.pop());
     }
-    context.leaveMacroInvocation(node.isTopLevel());
+    context.leaveMacroInvocation(node.isTopLevel);
     return data;
   }
 
-  private ExpressionStatement<?> visitAbstractInvocation(Object data, SimpleNode node,
+  private ExpressionStatement<?> visitAbstractInvocation(Object data, Node node,
       AbstractInvocation<?> invocation) {
     Context context = (Context) data;
     invocation.ofAST(node);
     int i = 0;
-    final int numChildren = node.getNumChildren();
+    final int numChildren = node.children.length;
     for (i = 0; i < numChildren; i++) {
-      SimpleNode argumentNode = (SimpleNode) node.getChild(i);
-      if (argumentNode instanceof AnonymousFunctionInvocation) {
+      Node argumentNode = (Node) node.children[i];
+      if (argumentNode instanceof golo.parser.ast.AnonymousFunctionInvocation) {
         break;
       }
-      argumentNode.accept(this, context);
+      this.visit(argumentNode, context);
       ExpressionStatement<?> statement = ExpressionStatement.of(context.pop());
       checkNamedArgument(context, node, invocation, statement);
       invocation.withArgs(statement);
@@ -700,7 +693,7 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
     ExpressionStatement<?> result = invocation;
     if (i < numChildren) {
       for (; i < numChildren; i++) {
-        node.getChild(i).accept(this, context);
+        this.visit(node.children[i], context);
         result = result.call(context.pop());
       }
     }
@@ -710,68 +703,68 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   @Override
   public Object visit(golo.parser.ast.ConditionalBranching node, Object data) {
     Context context = (Context) data;
-    node.getChild(1).accept(this, data);
-    node.getChild(0).accept(this, data);
+    this.visit(node.children[1], data);
+    this.visit(node.children[0], data);
 
     ConditionalBranching conditionalBranching = ConditionalBranching.branch().ofAST(node).condition(context.pop())
         .whenTrue(context.pop());
 
-    if (node.getNumChildren() > 2) {
-      node.getChild(2).accept(this, data);
+    if (node.children.length > 2) {
+      this.visit(node.children[2], data);
       conditionalBranching.otherwise(context.pop());
     }
     context.push(conditionalBranching);
     return data;
   }
 
-  private Object visitAlternatives(Object data, SimpleNode node, Alternatives<?> alternatives) {
+  private Object visitAlternatives(Object data, Node node, Alternatives<?> alternatives) {
     Context context = (Context) data;
-    final int lastWhen = node.getNumChildren() - 1;
+    final int lastWhen = node.children.length - 1;
     for (int i = 0; i < lastWhen; i += 2) {
-      node.getChild(i).accept(this, data);
+      this.visit(node.children[i], data);
       alternatives.when(context.pop());
-      node.getChild(i + 1).accept(this, data);
+      this.visit(node.children[i + 1], data);
       alternatives.then(context.pop());
     }
-    node.getChild(lastWhen).accept(this, data);
+    this.visit(node.children[lastWhen], data);
     alternatives.otherwise(context.pop());
     context.push(alternatives);
     return data;
   }
 
   @Override
-  public Object visit(Case node, Object data) {
+  public Object visit(golo.parser.ast.Case node, Object data) {
     return visitAlternatives(data, node, CaseStatement.cases().ofAST(node));
   }
 
   @Override
-  public Object visit(Match node, Object data) {
+  public Object visit(golo.parser.ast.Match node, Object data) {
     return visitAlternatives(data, node, MatchExpression.match().ofAST(node));
   }
 
   @Override
-  public Object visit(WhileLoop node, Object data) {
+  public Object visit(golo.parser.ast.WhileLoop node, Object data) {
     Context context = (Context) data;
-    node.getChild(1).accept(this, data);
-    node.getChild(0).accept(this, data);
+    this.visit(node.children[1], data);
+    this.visit(node.children[0], data);
     context.push(LoopStatement.loop().condition(context.pop()).ofAST(node).block(Block.of(context.pop())));
     return data;
   }
 
   @Override
-  public Object visit(ForLoop node, Object data) {
+  public Object visit(golo.parser.ast.ForLoop node, Object data) {
     Context context = (Context) data;
     Block containingBlock = context.enterScope();
 
-    node.getChild(0).accept(this, data);
-    node.getChild(1).accept(this, data);
-    node.getChild(2).accept(this, data);
+    this.visit(node.children[0], data);
+    this.visit(node.children[1], data);
+    this.visit(node.children[2], data);
 
     LoopStatement loopStatement = LoopStatement.loop().ofAST(node).post(context.pop()).condition(context.pop())
         .init(context.pop());
 
-    if (node.getNumChildren() == 4) {
-      node.getChild(3).accept(this, data);
+    if (node.children.length == 4) {
+      this.visit(node.children[3], data);
       loopStatement.block(Block.of(context.pop()));
     }
     context.push(containingBlock.add(loopStatement));
@@ -780,33 +773,33 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(ForEachLoop node, Object data) {
+  public Object visit(golo.parser.ast.ForEachLoop node, Object data) {
     Context context = (Context) data;
     Block containingBlock = context.enterScope();
 
-    node.getChild(0).accept(this, data);
+    this.visit(node.children[0], data);
 
-    ForEachLoopStatement foreach = ForEachLoopStatement.create().ofAST(node).varargs(node.isVarargs())
+    ForEachLoopStatement foreach = ForEachLoopStatement.create().ofAST(node).varargs(node.isVarargs)
         .in(context.pop());
 
-    if (node.getElementIdentifier() != null) {
-      foreach.var(node.getElementIdentifier());
+    if (node.elementIdentifier != null) {
+      foreach.var(node.elementIdentifier);
     } else {
-      for (String name : node.getNames()) {
+      for (String name : node.names) {
         foreach.var(name);
       }
     }
 
     // there may be no block if we are in a collection comprehension, checking what we have...
-    int numChildren = node.getNumChildren();
+    int numChildren = node.children.length;
     if (numChildren > 2) {
       // when and block: it's a regular loop with a when clause
-      node.getChild(2).accept(this, data);
-      node.getChild(1).accept(this, data);
+      this.visit(node.children[2], data);
+      this.visit(node.children[1], data);
       foreach.when(context.pop()).block(context.pop());
     } else if (numChildren == 2) {
       // either a when and no block in collection comprehension or no when an block in regular loop
-      node.getChild(1).accept(this, data);
+      this.visit(node.children[1], data);
       Object child = context.pop();
       if (child instanceof Block) {
         foreach.block(child);
@@ -824,26 +817,26 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   @Override
   public Object visit(golo.parser.ast.TryCatchFinally node, Object data) {
     Context context = (Context) data;
-    boolean hasCatchBlock = (node.getExceptionId() != null);
+    boolean hasCatchBlock = (node.exceptionId != null);
     TryCatchFinally tryCatchFinally = TryCatchFinally.tryCatch().ofAST(node);
 
     context.enterScope();
-    node.getChild(0).accept(this, data);
+    this.visit(node.children[0], data);
     tryCatchFinally.trying(context.pop());
     context.leaveScope();
 
     context.enterScope();
-    node.getChild(1).accept(this, data);
+    this.visit(node.children[1], data);
     if (hasCatchBlock) {
-      tryCatchFinally.catching(node.getExceptionId(), context.pop());
+      tryCatchFinally.catching(node.exceptionId, context.pop());
     } else {
       tryCatchFinally.finalizing(context.pop());
     }
     context.leaveScope();
 
-    if (hasCatchBlock && node.getNumChildren() > 2) {
+    if (hasCatchBlock && node.children.length > 2) {
       context.enterScope();
-      node.getChild(2).accept(this, data);
+      this.visit(node.children[2], data);
       tryCatchFinally.finalizing(context.pop());
       context.leaveScope();
     }
@@ -854,11 +847,11 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
 
   @Override
   public Object visit(golo.parser.ast.ExpressionStatement node, Object data) {
-    node.childrenAccept(this, data);
+    this.visitAll(node, data);
     return data;
   }
 
-  private void createOperatorChain(List<String> opSymbols, SimpleNode node, Context context) {
+  private void createOperatorChain(List<String> opSymbols, Node node, Context context) {
     List<OperatorType> operators = opSymbols.stream().map(OperatorType::of).collect(Collectors.toList());
     List<ExpressionStatement<?>> statements = operatorStatements(context, operators.size());
     ExpressionStatement<?> operation = assembleBinaryOperation(statements, operators).ofAST(node);
@@ -866,10 +859,10 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(InvocationExpression node, Object data) {
+  public Object visit(golo.parser.ast.InvocationExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, context);
-    createOperatorChain(node.getOperators(), node, context);
+    this.visitAll(node, context);
+    createOperatorChain(node.operators, node, context);
     return data;
   }
 
@@ -897,81 +890,81 @@ public class ParseTreeToGoloIrVisitor implements GoloParserVisitor {
   }
 
   @Override
-  public Object visit(MultiplicativeExpression node, Object data) {
+  public Object visit(golo.parser.ast.MultiplicativeExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, context);
-    createOperatorChain(node.getOperators(), node, context);
+    this.visitAll(node, context);
+    createOperatorChain(node.operators, node, context);
     return data;
   }
 
   @Override
-  public Object visit(AdditiveExpression node, Object data) {
+  public Object visit(golo.parser.ast.AdditiveExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, context);
-    createOperatorChain(node.getOperators(), node, context);
+    this.visitAll(node, context);
+    createOperatorChain(node.operators, node, context);
     return data;
   }
 
   @Override
-  public Object visit(RelationalExpression node, Object data) {
+  public Object visit(golo.parser.ast.RelationalExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
-    BinaryOperation operation = BinaryOperation.of(node.getOperator()).right(context.pop()).left(context.pop())
+    this.visitAll(node, data);
+    BinaryOperation operation = BinaryOperation.of(node.operator).right(context.pop()).left(context.pop())
         .ofAST(node);
     context.push(operation);
     return data;
   }
 
   @Override
-  public Object visit(EqualityExpression node, Object data) {
+  public Object visit(golo.parser.ast.EqualityExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, data);
-    BinaryOperation operation = BinaryOperation.of(node.getOperator()).right(context.pop()).left(context.pop())
+    this.visitAll(node, data);
+    BinaryOperation operation = BinaryOperation.of(node.operator).right(context.pop()).left(context.pop())
         .ofAST(node);
     context.push(operation);
     return data;
   }
 
   @Override
-  public Object visit(AndExpression node, Object data) {
+  public Object visit(golo.parser.ast.AndExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, context);
-    List<ExpressionStatement<?>> statements = operatorStatements(context, node.count());
-    BinaryOperation operation = assembleBinaryOperation(statements, nCopies(node.count(), OperatorType.AND))
+    this.visitAll(node, context);
+    List<ExpressionStatement<?>> statements = operatorStatements(context, node.count);
+    BinaryOperation operation = assembleBinaryOperation(statements, nCopies(node.count, OperatorType.AND))
         .ofAST(node);
     context.push(operation);
     return data;
   }
 
   @Override
-  public Object visit(OrExpression node, Object data) {
+  public Object visit(golo.parser.ast.OrExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, context);
-    List<ExpressionStatement<?>> statements = operatorStatements(context, node.count());
-    BinaryOperation operation = assembleBinaryOperation(statements, nCopies(node.count(), OperatorType.OR)).ofAST(node);
+    this.visitAll(node, context);
+    List<ExpressionStatement<?>> statements = operatorStatements(context, node.count);
+    BinaryOperation operation = assembleBinaryOperation(statements, nCopies(node.count, OperatorType.OR)).ofAST(node);
     context.push(operation);
     return data;
   }
 
   @Override
-  public Object visit(OrIfNullExpression node, Object data) {
+  public Object visit(golo.parser.ast.OrIfNullExpression node, Object data) {
     Context context = (Context) data;
-    node.childrenAccept(this, context);
-    List<ExpressionStatement<?>> statements = operatorStatements(context, node.count());
-    BinaryOperation operation = assembleBinaryOperation(statements, nCopies(node.count(), OperatorType.ORIFNULL))
+    this.visitAll(node, context);
+    List<ExpressionStatement<?>> statements = operatorStatements(context, node.count);
+    BinaryOperation operation = assembleBinaryOperation(statements, nCopies(node.count, OperatorType.ORIFNULL))
         .ofAST(node);
     context.push(operation);
     return data;
   }
 
   @Override
-  public Object visit(LocalDeclaration node, Object data) {
+  public Object visit(golo.parser.ast.LocalDeclaration node, Object data) {
     Context context = (Context) data;
     ExpressionStatement<?> expr = (ExpressionStatement<?>) context.peek();
     boolean oldState = context.inLocalDeclaration;
     context.inLocalDeclaration = true;
-    for (int i = 0; i < node.getNumChildren(); i++) {
-      node.getChild(i).accept(this, data);
+    for (int i = 0; i < node.children.length; i++) {
+      this.visit(node.children[i], data);
       try {
         expr.with(context.pop());
       } catch (UnsupportedOperationException ex) {

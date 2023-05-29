@@ -1,14 +1,13 @@
 package golo.runtime.spi;
 
-import java.util.Comparator;
-import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Function;
-
 import golo.compiler.GoloCompilationException;
 import golo.lang.Messages;
 import golo.lang.ir.GoloModule;
 
+import java.util.Comparator;
+import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.lang.invoke.MethodHandle;
 import java.io.File;
 
@@ -16,44 +15,23 @@ import static golo.lang.Messages.*;
 import static java.lang.invoke.MethodHandles.publicLookup;
 import static java.lang.invoke.MethodType.methodType;
 
+
 public interface CliCommand {
 
   Comparator<GoloModule> MODULE_COMPARATOR = (GoloModule m1, GoloModule m2) -> {
-    if (m1 == null && m2 != null) {
-      return -1;
-    }
-    if (m1 != null && m2 == null) {
-      return 1;
-    }
-    if (m1 == null && m2 == null) {
-      return 0;
-    }
-    if (m1.hasMacros() && !m2.hasMacros()) {
-      return -1;
-    }
-    if (!m1.hasMacros() && m2.hasMacros()) {
-      return 1;
-    }
+    if (m1 == null && m2 != null) { return -1; }
+    if (m1 != null && m2 == null) { return 1; }
+    if (m1 == null && m2 == null) { return 0; }
+    if (m1.hasMacros() && !m2.hasMacros()) { return -1; }
+    if (!m1.hasMacros() && m2.hasMacros()) { return 1; }
     Set<String> m1Used = m1.getUsedModules();
     Set<String> m2Used = m2.getUsedModules();
-    if (m1Used.contains(m2.getPackageAndClass().toString())) {
-      return 1;
-    }
-    if (m2Used.contains(m1.getPackageAndClass().toString())) {
-      return -1;
-    }
-    if (m1.getImports().stream().anyMatch((mi) -> mi.getPackageAndClass().equals(m2.getPackageAndClass()))) {
-      return 1;
-    }
-    if (m2.getImports().stream().anyMatch((mi) -> mi.getPackageAndClass().equals(m1.getPackageAndClass()))) {
-      return -1;
-    }
-    if (m1.hasMain() && !m2.hasMain()) {
-      return 1;
-    }
-    if (m2.hasMain() && !m1.hasMain()) {
-      return -1;
-    }
+    if (m1Used.contains(m2.getPackageAndClass().toString())) { return 1; }
+    if (m2Used.contains(m1.getPackageAndClass().toString())) { return -1; }
+    if (m1.getImports().stream().anyMatch((mi) -> mi.getPackageAndClass().equals(m2.getPackageAndClass()))) { return 1; }
+    if (m2.getImports().stream().anyMatch((mi) -> mi.getPackageAndClass().equals(m1.getPackageAndClass()))) { return -1; }
+    if (m1.hasMain() && !m2.hasMain()) { return 1; }
+    if (m2.hasMain() && !m1.hasMain()) { return -1; }
     return 0;
   };
 
@@ -70,9 +48,7 @@ public interface CliCommand {
   }
 
   default boolean canRead(File source) {
-    if (source == null) {
-      return false;
-    }
+    if (source == null) { return false; }
     if (!source.canRead()) {
       warning(message("file_not_found", source.getPath()));
       return false;
@@ -176,8 +152,7 @@ public interface CliCommand {
     }
   }
 
-  class NoMainMethodException extends NoSuchMethodException {
-  }
+  class NoMainMethodException extends NoSuchMethodException { }
 
   @FunctionalInterface
   interface GolofileAction {

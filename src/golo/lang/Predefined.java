@@ -13,7 +13,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-import org.objectweb.asm.Type;
+import org.ow2.asm.Type;
 
 import golo.compiler.macro.Macro;
 import golo.lang.ir.GoloElement;

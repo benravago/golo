@@ -1,7 +1,6 @@
 package golo.lang;
 
 import golo.runtime.spi.CliCommand;
-
 import golo.compiler.GoloClassLoader;
 import golo.lang.ir.GoloModule;
 
